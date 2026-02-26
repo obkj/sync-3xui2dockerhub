@@ -1,0 +1,32 @@
+name: Mirror Public Image to Docker Hub
+
+on:
+  workflow_dispatch: # 支持手动点击按钮触发同步
+  schedule:
+    - cron: '0 2 * * *' # 每天凌晨2点自动检查并同步
+
+jobs:
+  mirror-job:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. 登录你的 Docker Hub (目标方)
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # 2. 使用 Skopeo 进行跨仓库拷贝
+      # Skopeo 不需要 Pull 镜像到本地磁盘，直接在远程 Registry 之间传输
+      # --all 参数确保同步所有架构（amd64, arm64, arm/v7 等）
+      - name: Sync from GHCR to Docker Hub
+        run: |
+          skopeo copy \
+            --all \
+            --src-tls-verify=true \
+            --dest-tls-verify=true \
+            docker://ghcr.io/mhsanaei/3x-ui:latest \
+            docker://docker.io/${{ secrets.DOCKERHUB_USERNAME }}/3x-ui:latest
+
+      - name: Success Confirmation
+        run: echo "镜像已成功从 GHCR 同步至 Docker Hub！"
